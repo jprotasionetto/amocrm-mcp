@@ -6,7 +6,7 @@ Runtime composition:
 4. Creates FastMCP instance with AmoClient as context dependency
 5. Imports src/tools/__init__.py triggering @mcp.tool() decorator registration
 6. Logs tool count registered
-7. Runs FastMCP with configured transport (stdio default, sse via config)
+7. Runs FastMCP with configured transport (stdio default, http via config)
 """
 
 from __future__ import annotations
@@ -117,10 +117,11 @@ async def _async_main() -> None:
         )
 
     try:
-        if config.transport == "sse":
-            # FastMCP 2+/3+: use run_async with transport parameter
+        if config.transport in ("sse", "http"):
+            # FastMCP 3+: Streamable HTTP transport (endpoint: /mcp)
+            # SSE legacy is deprecated - use http transport for Claude.ai compatibility
             await mcp.run_async(
-                transport="sse",
+                transport="http",
                 host="0.0.0.0",
                 port=config.port,
             )
