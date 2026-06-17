@@ -28,59 +28,63 @@ mcp = FastMCP("amoCRM MCP Server")
 
 _client: AmoClient | None = None
 
+
 async def execute_tool(fn: Callable[..., dict], *args: Any, **kwargs: Any) -> dict:
     """Shared wrapper that invokes a tool function with the AmoClient instance.
-        Catches typed client exceptions and converts them into FR-23 error envelopes.
-            All tool handlers delegate here for consistent error handling.
-                """
+    Catches typed client exceptions and converts them into FR-23 error envelopes.
+    All tool handlers delegate here for consistent error handling.
+    """
     if _client is None:
-                return error_response(
-                                "Server not initialized",
-                                500,
-                                "AmoClient has not been created. Server startup may have failed.",
-                )
-            try:
-                        return await fn(_client, *args, **kwargs)
-except AmoAPIError as exc:
-            return error_response(exc.message, exc.status_code, exc.detail)
-except RefreshTokenExpiredError as exc:
-            return error_response(
-                            "Refresh token expired",
-                            401,
-                            str(exc),
-            )
-except AuthError as exc:
-            return error_response(
-                            "Authentication error",
-                            401,
-                            str(exc),
-            )
+        return error_response(
+            "Server not initialized",
+            500,
+            "AmoClient has not been created. Server startup may have failed.",
+        )
+    try:
+        return await fn(_client, *args, **kwargs)
+    except AmoAPIError as exc:
+        return error_response(exc.message, exc.status_code, exc.detail)
+    except RefreshTokenExpiredError as exc:
+        return error_response(
+            "Refresh token expired",
+            401,
+            str(exc),
+        )
+    except AuthError as exc:
+        return error_response(
+            "Authentication error",
+            401,
+            str(exc),
+        )
+
 
 def main() -> None:
-        """Compose runtime and start the MCP server."""
-        import asyncio
+    """Compose runtime and start the MCP server."""
+    import asyncio
 
     asyncio.run(_async_main())
 
+
 def _get_tool_count() -> int:
-        """Get the number of registered tools in a version-compatible way."""
-        # FastMCP 2+/3+ stores tools in _tool_manager
-        if hasattr(mcp, '_tool_manager') and hasattr(mcp._tool_manager, 'tools'):
-                    return len(mcp._tool_manager.tools)
-                # FastMCP 1.x async get_tools() - fallback via _tools dict
-                if hasattr(mcp, '_tools'):
-                            return len(mcp._tools)
-                        # If we can't determine, return 0 to skip the check
-                        logger.warning("Cannot determine tool count - skipping validation")
+    """Get the number of registered tools in a version-compatible way."""
+    # FastMCP 2+/3+ stores tools in _tool_manager
+    if hasattr(mcp, '_tool_manager') and hasattr(mcp._tool_manager, 'tools'):
+        return len(mcp._tool_manager.tools)
+    # FastMCP 1.x - fallback via _tools dict
+    if hasattr(mcp, '_tools'):
+        return len(mcp._tools)
+    # If we can't determine, return expected count to skip validation
+    logger.warning("Cannot determine tool count - skipping validation")
     return EXPECTED_TOOL_COUNT
 
+
 async def _async_main() -> None:
-        """Async composition and server startup."""
+    """Async composition and server startup."""
     global _client
 
     logging.basicConfig(
-                level=logging.INFO,
-                format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
     from amocrm_mcp.config import Config
@@ -100,28 +104,28 @@ async def _async_main() -> None:
 
     tool_count = _get_tool_count()
     if tool_count != EXPECTED_TOOL_COUNT:
-                logger.warning(
-                                "Expected %d tools registered, got %d.",
-                                EXPECTED_TOOL_COUNT,
-                                tool_count,
-                )
-else:
+        logger.warning(
+            "Expected %d tools registered, got %d.",
+            EXPECTED_TOOL_COUNT,
+            tool_count,
+        )
+    else:
         logger.info(
-                        "amoCRM MCP server started with %d tools on %s transport",
-                        tool_count,
-                        config.transport,
+            "amoCRM MCP server started with %d tools on %s transport",
+            tool_count,
+            config.transport,
         )
 
     try:
-                if config.transport == "sse":
-                                # FastMCP 2+/3+: use run_async with transport parameter
-                                await mcp.run_async(
-                                                    transport="sse",
-                                                    host="0.0.0.0",
-                                                    port=config.port,
-                                )
-    else:
+        if config.transport == "sse":
+            # FastMCP 2+/3+: use run_async with transport parameter
+            await mcp.run_async(
+                transport="sse",
+                host="0.0.0.0",
+                port=config.port,
+            )
+        else:
             await mcp.run_async()
     finally:
         if _client is not None:
-                        await _client.close()
+            await _client.close()
